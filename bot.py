@@ -217,7 +217,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sensor_type = 'NTC10K' if data == 'sensor_ntc10k' else 'PT100'
         context.user_data['sensor_type'] = sensor_type
         await query.answer(f"نوع سنسور {sensor_type} انتخاب شد")
-        # ⬅️ بازگشت اتوماتیک به منوی سفارش
         await show_order_summary(query, context)
 
     # --- انتخاب ابعاد غلاف ---
@@ -237,7 +236,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dimensions = '6×50' if data == 'dim_6x50' else '4×25'
         context.user_data['dimensions'] = dimensions
         await query.answer(f"ابعاد {dimensions} انتخاب شد")
-        # ⬅️ بازگشت اتوماتیک به منوی سفارش
         await show_order_summary(query, context)
 
     # --- انتخاب طول سیم ---
@@ -289,8 +287,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- ماشین حساب تخمین قیمت ---
     elif data == 'calculator':
         keyboard = [
-            [InlineKeyboardButton("NTC 5K - 12,000 تومان", callback_data='calc_sensor_12000')],
-            [InlineKeyboardButton("NTC 10K - 15,000 تومان", callback_data='calc_sensor_15000')],
+            [InlineKeyboardButton("NTC 5K", callback_data='calc_sensor_12000')],
+            [InlineKeyboardButton("NTC 10K", callback_data='calc_sensor_15000')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='products')]
         ]
         await query.edit_message_text(
@@ -303,16 +301,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['calc_sensor_price'] = price
         await query.answer("نوع سنسور انتخاب شد")
         keyboard = [
-            [InlineKeyboardButton("25×4 - 10,000 تومان", callback_data='calc_sheath_10000')],
-            [InlineKeyboardButton("50×4 - 10,500 تومان", callback_data='calc_sheath_10500')],
-            [InlineKeyboardButton("100×4 - 11,000 تومان", callback_data='calc_sheath_11000')],
-            [InlineKeyboardButton("25×5 - 11,500 تومان", callback_data='calc_sheath_11500')],
-            [InlineKeyboardButton("50×50 - 12,000 تومان", callback_data='calc_sheath_12000')],
-            [InlineKeyboardButton("30×5 - 12,500 تومان", callback_data='calc_sheath_12500')],
-            [InlineKeyboardButton("30×6 - 13,000 تومان", callback_data='calc_sheath_13000')],
-            [InlineKeyboardButton("40×6 - 13,500 تومان", callback_data='calc_sheath_13500')],
-            [InlineKeyboardButton("50×6 سرتخت - 14,000 تومان", callback_data='calc_sheath_14000')],
-            [InlineKeyboardButton("50×6 سرگرد - 14,500 تومان", callback_data='calc_sheath_14500')],
+            [InlineKeyboardButton("25×4", callback_data='calc_sheath_10000')],
+            [InlineKeyboardButton("50×4", callback_data='calc_sheath_10500')],
+            [InlineKeyboardButton("100×4", callback_data='calc_sheath_11000')],
+            [InlineKeyboardButton("25×5", callback_data='calc_sheath_11500')],
+            [InlineKeyboardButton("50×50", callback_data='calc_sheath_12000')],
+            [InlineKeyboardButton("30×5", callback_data='calc_sheath_12500')],
+            [InlineKeyboardButton("30×6", callback_data='calc_sheath_13000')],
+            [InlineKeyboardButton("40×6", callback_data='calc_sheath_13500')],
+            [InlineKeyboardButton("50×6 سرتخت", callback_data='calc_sheath_14000')],
+            [InlineKeyboardButton("50×6 سرگرد", callback_data='calc_sheath_14500')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='calculator')]
         ]
         await query.edit_message_text(
@@ -377,8 +375,27 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 40 <= length <= 500:
                 context.user_data['wire_length'] = length
                 context.user_data['awaiting_wire_length'] = False
-                # ⬅️ بازگشت اتوماتیک به منوی سفارش
-                await show_order_summary(update.callback_query, context)
+
+                # ارسال دوباره منوی سفارش
+                order_text = """📋 مشخصات سفارش شما:
+🎯 نوع سنسور: {}
+📐 ابعاد غلاف: {}
+📏 طول سیم: {}
+🔢 تعداد: {}""".format(
+                    f"✨ {context.user_data.get('sensor_type')}" if context.user_data.get('sensor_type') else "❌ انتخاب نشده",
+                    f"✨ {context.user_data.get('dimensions')}" if context.user_data.get('dimensions') else "❌ انتخاب نشده",
+                    f"✨ {length} سانتی‌متر",
+                    f"✨ {context.user_data.get('quantity')} عدد" if context.user_data.get('quantity') else "❌ انتخاب نشده"
+                )
+                reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🎯 انتخاب نوع سنسور", callback_data='select_sensor_type')],
+                    [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
+                    [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
+                    [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
+                    [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
+                    [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
+                ])
+                await update.message.reply_text(text=order_text, reply_markup=reply_markup)
             else:
                 await update.message.reply_text("❌ لطفاً عددی بین 40 تا 500 وارد کنید.")
         except ValueError:
@@ -391,8 +408,27 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if quantity > 0:
                 context.user_data['quantity'] = quantity
                 context.user_data['awaiting_quantity'] = False
-                # ⬅️ بازگشت اتوماتیک به منوی سفارش
-                await show_order_summary(update.callback_query, context)
+
+                # ارسال دوباره منوی سفارش
+                order_text = """📋 مشخصات سفارش شما:
+🎯 نوع سنسور: {}
+📐 ابعاد غلاف: {}
+📏 طول سیم: {}
+🔢 تعداد: {}""".format(
+                    f"✨ {context.user_data.get('sensor_type')}" if context.user_data.get('sensor_type') else "❌ انتخاب نشده",
+                    f"✨ {context.user_data.get('dimensions')}" if context.user_data.get('dimensions') else "❌ انتخاب نشده",
+                    f"✨ {context.user_data.get('wire_length')} سانتی‌متر" if context.user_data.get('wire_length') else "❌ انتخاب نشده",
+                    f"✨ {quantity} عدد"
+                )
+                reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🎯 انتخاب نوع سنسور", callback_data='select_sensor_type')],
+                    [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
+                    [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
+                    [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
+                    [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
+                    [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
+                ])
+                await update.message.reply_text(text=order_text, reply_markup=reply_markup)
             else:
                 await update.message.reply_text("❌ لطفاً یک عدد مثبت وارد کنید.")
         except ValueError:
@@ -430,14 +466,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             final_price = int(base_price * factor)
 
+            # ✅ فقط قیمت نهایی نمایش داده میشه
             result_text = f"""✅ قیمت تخمینی سنسور دما:
-- نوع سنسور: {sensor_price:,} تومان
-- نوع غلاف: {sheath_price:,} تومان
-- کابل ({length} متر): {cable_total:,.0f} تومان
-- هزینه مونتاژ: 25,000 تومان
-- هزینه اضافه: 7,000 تومان
-- سود: 15,000 تومان
-🔧 فاکتور سختی کار: x{factor}
 💰 قیمت نهایی: {final_price:,.0f} تومان"""
 
             reply_markup = InlineKeyboardMarkup([
