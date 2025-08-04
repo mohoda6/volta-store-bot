@@ -175,21 +175,63 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
 
     elif data == 'order':
-        await show_order_summary(query, context)
+        order_text = """📋 مشخصات سفارش شما:
+🎯 نوع سنسور: {}
+📐 ابعاد غلاف: {}
+📏 طول سیم: {}
+🔢 تعداد: {}""".format(
+            "❌ انتخاب نشده" if not context.user_data.get('sensor_type') else f"✨ {context.user_data.get('sensor_type')}",
+            "❌ انتخاب نشده" if not context.user_data.get('dimensions') else f"✨ {context.user_data.get('dimensions')}",
+            "❌ انتخاب نشده" if not context.user_data.get('wire_length') else f"✨ {context.user_data.get('wire_length')} سانتی‌متر",
+            "❌ انتخاب نشده" if not context.user_data.get('quantity') else f"✨ {context.user_data.get('quantity')} عدد"
+        )
+        reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎯 انتخاب نوع سنسور", callback_data='select_sensor_type')],
+            [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
+            [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
+            [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
+            [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
+            [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
+        ])
+        await query.edit_message_text(text=order_text, reply_markup=reply_markup)
 
     # --- پردازش انتخاب نوع سنسور ---
+    elif data == 'select_sensor_type':
+        keyboard = [
+            [InlineKeyboardButton("🌡️ NTC10K", callback_data='sensor_ntc10k')],
+            [InlineKeyboardButton("🌡️ PT100", callback_data='sensor_pt100')],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data='order')]
+        ]
+        await query.edit_message_text(
+            text="🎯 لطفاً نوع سنسور را انتخاب کنید:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
     elif data.startswith('sensor_'):
         sensor_type = 'NTC10K' if data == 'sensor_ntc10k' else 'PT100'
         context.user_data['sensor_type'] = sensor_type
         await query.answer(f"نوع سنسور {sensor_type} انتخاب شد")
-        await show_order_summary(query, context)
+        # بازگشت به منوی سفارش با خلاصه به‌روز
+        await button_handler(update, context)  # بازگشت به 'order'
 
     # --- پردازش انتخاب ابعاد ---
+    elif data == 'select_dimensions':
+        keyboard = [
+            [InlineKeyboardButton("📏 6×50", callback_data='dim_6x50')],
+            [InlineKeyboardButton("📏 4×25", callback_data='dim_4x25')],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data='order')]
+        ]
+        await query.edit_message_text(
+            text="📐 لطفاً ابعاد غلاف را انتخاب کنید:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
     elif data.startswith('dim_'):
         dimensions = '6×50' if data == 'dim_6x50' else '4×25'
         context.user_data['dimensions'] = dimensions
         await query.answer(f"ابعاد {dimensions} انتخاب شد")
-        await show_order_summary(query, context)
+        # بازگشت به منوی سفارش با خلاصه به‌روز
+        await button_handler(update, context)  # بازگشت به 'order'
 
     # --- انتخاب طول سیم ---
     elif data == 'select_wire_length':
@@ -213,10 +255,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ لطفاً تمام موارد سفارش را تکمیل کنید.", show_alert=True)
         else:
             final_price = calculate_price(context)
-            if final_price is None:
-                await query.answer("⚠️ خطایی در محاسبه قیمت رخ داد.")
-                return
-
             order_details = f"""✅ سفارش جدید با مشخصات زیر ثبت شد:
 - نوع سنسور: {context.user_data.get('sensor_type')}
 - ابعاد غلاف: {context.user_data.get('dimensions')}
@@ -245,7 +283,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text="📌 منوی محصولات:", reply_markup=InlineKeyboardMarkup(product_menu))
 
     elif data == 'payment_info':
-        payment_text = "💳 لطفاً از یکی از روش‌های زیر برای پرداخت استفاده کنید:"
+        payment_text = """💳 اطلاعات پرداخت:
+لطفاً از یکی از روش‌های زیر برای پرداخت استفاده کنید:"""
         payment_menu = [
             [InlineKeyboardButton("💳 شماره کارت", callback_data='card_number')],
             [InlineKeyboardButton("📱 شماره شبا", callback_data='sheba_number')],
@@ -262,7 +301,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         send_receipt_button = [
             [InlineKeyboardButton("📸 ارسال رسید پرداخت", callback_data='send_receipt')],
-            [InlineKeyboardButton("🔙 بازگشت", callback_data='payment_info')]
+            [InlineKeyboardButton("🔙 بازگشت به منوی پرداخت", callback_data='payment_info')]
         ]
         await query.edit_message_text(
             text=f"{payment_info[data]}\n✨ پس از پرداخت، لطفاً رسید را ارسال کنید.",
@@ -276,28 +315,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='payment_info')]])
         )
 
-# --- نمایش خلاصه سفارش ---
-async def show_order_summary(query, context):
-    order_text = """📋 مشخصات سفارش شما:
-🎯 نوع سنسور: {}
-📐 ابعاد غلاف: {}
-📏 طول سیم: {}
-🔢 تعداد: {}""".format(
-        f"✨ {context.user_data.get('sensor_type')}" if context.user_data.get('sensor_type') else "❌ انتخاب نشده",
-        f"✨ {context.user_data.get('dimensions')}" if context.user_data.get('dimensions') else "❌ انتخاب نشده",
-        f"✨ {context.user_data.get('wire_length')} سانتی‌متر" if context.user_data.get('wire_length') else "❌ انتخاب نشده",
-        f"✨ {context.user_data.get('quantity')} عدد" if context.user_data.get('quantity') else "❌ انتخاب نشده"
-    )
-    reply_markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎯 انتخاب نوع سنسور", callback_data='select_sensor_type')],
-        [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
-        [InlineKeyboardButton("📏 انتخاب طول سیم", callback_data='select_wire_length')],
-        [InlineKeyboardButton("🔢 انتخاب تعداد", callback_data='select_quantity')],
-        [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
-        [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
-    ])
-    await query.edit_message_text(text=order_text, reply_markup=reply_markup)
-
 # --- هندلر پیام‌های متنی ---
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'awaiting_wire_length' in context.user_data and context.user_data['awaiting_wire_length']:
@@ -306,7 +323,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 40 <= length <= 500:
                 context.user_data['wire_length'] = length
                 context.user_data['awaiting_wire_length'] = False
-                await show_order_summary(update.callback_query, context)
+                # بازگشت به منوی سفارش
+                await button_handler(update, context)
             else:
                 await update.message.reply_text("❌ لطفاً عددی بین 40 تا 500 وارد کنید.")
         except ValueError:
@@ -318,7 +336,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if quantity > 0:
                 context.user_data['quantity'] = quantity
                 context.user_data['awaiting_quantity'] = False
-                await show_order_summary(update.callback_query, context)
+                # بازگشت به منوی سفارش
+                await button_handler(update, context)
             else:
                 await update.message.reply_text("❌ لطفاً یک عدد مثبت وارد کنید.")
         except ValueError:
