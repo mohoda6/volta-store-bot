@@ -329,7 +329,26 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 40 <= length <= 500:
                 context.user_data['wire_length'] = length
                 context.user_data['awaiting_wire_length'] = False
-                await show_order_summary(update.callback_query, context)
+                # ⬅️ ارسال دوباره منوی سفارش با خلاصه به‌روز
+                order_text = """📋 مشخصات سفارش شما:
+🎯 نوع سنسور: {}
+📐 ابعاد غلاف: {}
+📏 طول سیم: {}
+🔢 تعداد: {}""".format(
+                    f"✨ {context.user_data.get('sensor_type')}" if context.user_data.get('sensor_type') else "❌ انتخاب نشده",
+                    f"✨ {context.user_data.get('dimensions')}" if context.user_data.get('dimensions') else "❌ انتخاب نشده",
+                    f"✨ {length} سانتی‌متر",
+                    f"✨ {context.user_data.get('quantity')} عدد" if context.user_data.get('quantity') else "❌ انتخاب نشده"
+                )
+                reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🎯 انتخاب نوع سنسور", callback_data='select_sensor_type')],
+                    [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
+                    [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
+                    [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
+                    [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
+                    [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
+                ])
+                await update.message.reply_text(text=order_text, reply_markup=reply_markup)
             else:
                 await update.message.reply_text("❌ لطفاً عددی بین 40 تا 500 وارد کنید.")
         except ValueError:
@@ -341,7 +360,26 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if quantity > 0:
                 context.user_data['quantity'] = quantity
                 context.user_data['awaiting_quantity'] = False
-                await show_order_summary(update.callback_query, context)
+                # ⬅️ ارسال دوباره منوی سفارش با خلاصه به‌روز
+                order_text = """📋 مشخصات سفارش شما:
+🎯 نوع سنسور: {}
+📐 ابعاد غلاف: {}
+📏 طول سیم: {}
+🔢 تعداد: {}""".format(
+                    f"✨ {context.user_data.get('sensor_type')}" if context.user_data.get('sensor_type') else "❌ انتخاب نشده",
+                    f"✨ {context.user_data.get('dimensions')}" if context.user_data.get('dimensions') else "❌ انتخاب نشده",
+                    f"✨ {context.user_data.get('wire_length')} سانتی‌متر" if context.user_data.get('wire_length') else "❌ انتخاب نشده",
+                    f"✨ {quantity} عدد"
+                )
+                reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🎯 انتخاب نوع سنسور", callback_data='select_sensor_type')],
+                    [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
+                    [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
+                    [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
+                    [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
+                    [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
+                ])
+                await update.message.reply_text(text=order_text, reply_markup=reply_markup)
             else:
                 await update.message.reply_text("❌ لطفاً یک عدد مثبت وارد کنید.")
         except ValueError:
