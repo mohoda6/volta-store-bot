@@ -195,7 +195,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
         await query.edit_message_text(text=order_text, reply_markup=reply_markup)
 
-    # --- پردازش انتخاب نوع سنسور ---
+    # --- انتخاب نوع سنسور ---
     elif data == 'select_sensor_type':
         keyboard = [
             [InlineKeyboardButton("🌡️ NTC10K", callback_data='sensor_ntc10k')],
@@ -207,14 +207,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
+    # --- پردازش انتخاب نوع سنسور ---
     elif data.startswith('sensor_'):
         sensor_type = 'NTC10K' if data == 'sensor_ntc10k' else 'PT100'
         context.user_data['sensor_type'] = sensor_type
         await query.answer(f"نوع سنسور {sensor_type} انتخاب شد")
-        # بازگشت به منوی سفارش با خلاصه به‌روز
-        await button_handler(update, context)  # بازگشت به 'order'
+        # ⬅️ بازگشت خودکار به منوی سفارش
+        await button_handler(update, context)  # دوباره 'order' رو فراخوانی می‌کنه
 
-    # --- پردازش انتخاب ابعاد ---
+    # --- انتخاب ابعاد غلاف ---
     elif data == 'select_dimensions':
         keyboard = [
             [InlineKeyboardButton("📏 6×50", callback_data='dim_6x50')],
@@ -226,18 +227,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
+    # --- پردازش انتخاب ابعاد ---
     elif data.startswith('dim_'):
         dimensions = '6×50' if data == 'dim_6x50' else '4×25'
         context.user_data['dimensions'] = dimensions
         await query.answer(f"ابعاد {dimensions} انتخاب شد")
-        # بازگشت به منوی سفارش با خلاصه به‌روز
-        await button_handler(update, context)  # بازگشت به 'order'
+        # ⬅️ بازگشت خودکار به منوی سفارش
+        await button_handler(update, context)  # دوباره 'order' رو فراخوانی می‌کنه
 
     # --- انتخاب طول سیم ---
     elif data == 'select_wire_length':
         context.user_data['awaiting_wire_length'] = True
         await query.edit_message_text(
-            text="📏 لطفاً طول سیم را به سانتی‌متر وارد کنید (40 تا 500):",
+            text="📏 لطفاً طول سیم را به سانتی‌متر وارد کنید (40 تا 500):\n⚡️ محدوده مجاز: 40 تا 500 سانتی‌متر",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='order')]])
         )
 
@@ -245,7 +247,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == 'select_quantity':
         context.user_data['awaiting_quantity'] = True
         await query.edit_message_text(
-            text="🔢 لطفاً تعداد مورد نیاز را وارد کنید:",
+            text="🔢 لطفاً تعداد مورد نیاز را وارد کنید (عدد):",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='order')]])
         )
 
@@ -255,6 +257,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ لطفاً تمام موارد سفارش را تکمیل کنید.", show_alert=True)
         else:
             final_price = calculate_price(context)
+            if final_price is None:
+                await query.answer("⚠️ خطایی در محاسبه قیمت رخ داد.")
+                return
             order_details = f"""✅ سفارش جدید با مشخصات زیر ثبت شد:
 - نوع سنسور: {context.user_data.get('sensor_type')}
 - ابعاد غلاف: {context.user_data.get('dimensions')}
@@ -323,7 +328,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 40 <= length <= 500:
                 context.user_data['wire_length'] = length
                 context.user_data['awaiting_wire_length'] = False
-                # بازگشت به منوی سفارش
+                # ⬅️ بازگشت خودکار به منوی سفارش
                 await button_handler(update, context)
             else:
                 await update.message.reply_text("❌ لطفاً عددی بین 40 تا 500 وارد کنید.")
@@ -336,7 +341,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if quantity > 0:
                 context.user_data['quantity'] = quantity
                 context.user_data['awaiting_quantity'] = False
-                # بازگشت به منوی سفارش
+                # ⬅️ بازگشت خودکار به منوی سفارش
                 await button_handler(update, context)
             else:
                 await update.message.reply_text("❌ لطفاً یک عدد مثبت وارد کنید.")
