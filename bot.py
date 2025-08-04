@@ -94,15 +94,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
+
     if data == 'products':
         reply_markup = InlineKeyboardMarkup(product_menu)
         await query.edit_message_text(text="📌 منوی محصولات:", reply_markup=reply_markup)
+
     elif data == 'ntc10k':
         reply_markup = InlineKeyboardMarkup(ntc10k_menu)
         await query.edit_message_text(
             text="🌡️ سنسور دمای NTC10K\nلطفاً یکی از گزینه‌های زیر را انتخاب کنید:",
             reply_markup=reply_markup
         )
+
     elif data == 'contact':
         contact_text = """✨ ارتباط با ولتا استور ✨
 👤 مدیر فروش: محمد حسین داودی
@@ -116,6 +119,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
         await query.edit_message_text(text=contact_text, reply_markup=reply_markup)
 
+    # --- اطلاعات محصول ---
     product_info = {
         'specs': {
             'title': '📘 مشخصات فنی:',
@@ -171,30 +175,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
 
     elif data == 'order':
-        order_text = "📝 لطفاً مشخصات سفارش خود را انتخاب کنید:"
-        reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🌡️ نوع سنسور", callback_data='select_sensor_type')],
-            [InlineKeyboardButton("📏 ابعاد غلاف", callback_data='select_dimensions')],
-            [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
-            [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
-            [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
-            [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
-        ])
-        await query.edit_message_text(text=order_text, reply_markup=reply_markup)
+        await show_order_summary(query, context)
 
-    # --- پردازش انتخاب‌ها ---
+    # --- پردازش انتخاب نوع سنسور ---
     elif data.startswith('sensor_'):
         sensor_type = 'NTC10K' if data == 'sensor_ntc10k' else 'PT100'
         context.user_data['sensor_type'] = sensor_type
         await query.answer(f"نوع سنسور {sensor_type} انتخاب شد")
         await show_order_summary(query, context)
 
+    # --- پردازش انتخاب ابعاد ---
     elif data.startswith('dim_'):
         dimensions = '6×50' if data == 'dim_6x50' else '4×25'
         context.user_data['dimensions'] = dimensions
         await query.answer(f"ابعاد {dimensions} انتخاب شد")
         await show_order_summary(query, context)
 
+    # --- انتخاب طول سیم ---
     elif data == 'select_wire_length':
         context.user_data['awaiting_wire_length'] = True
         await query.edit_message_text(
@@ -202,6 +199,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='order')]])
         )
 
+    # --- انتخاب تعداد ---
     elif data == 'select_quantity':
         context.user_data['awaiting_quantity'] = True
         await query.edit_message_text(
@@ -209,14 +207,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='order')]])
         )
 
+    # --- ثبت نهایی سفارش ---
     elif data == 'final_order':
         if not all(key in context.user_data for key in ['sensor_type', 'dimensions', 'wire_length', 'quantity']):
-            await query.answer("❌ لطفاً تمام موارد سفارش را تکمیل کنید.")
+            await query.answer("❌ لطفاً تمام موارد سفارش را تکمیل کنید.", show_alert=True)
         else:
             final_price = calculate_price(context)
             if final_price is None:
                 await query.answer("⚠️ خطایی در محاسبه قیمت رخ داد.")
                 return
+
             order_details = f"""✅ سفارش جدید با مشخصات زیر ثبت شد:
 - نوع سنسور: {context.user_data.get('sensor_type')}
 - ابعاد غلاف: {context.user_data.get('dimensions')}
@@ -276,6 +276,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='payment_info')]])
         )
 
+# --- نمایش خلاصه سفارش ---
 async def show_order_summary(query, context):
     order_text = """📋 مشخصات سفارش شما:
 🎯 نوع سنسور: {}
