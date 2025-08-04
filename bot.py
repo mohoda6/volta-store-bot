@@ -18,7 +18,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# --- توکن از محیط بگیر (حتماً در Render تنظیم شود) ---
+# --- توکن از محیط بگیر ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ متغیر محیطی BOT_TOKEN تنظیم نشده است!")
@@ -300,3 +300,74 @@ async def show_order_summary(query, context):
 # --- هندلر پیام‌های متنی ---
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'awaiting_wire_length' in context.user_data and context.user_data['awaiting_wire_length']:
+        try:
+            length = int(update.message.text.strip())
+            if 40 <= length <= 500:
+                context.user_data['wire_length'] = length
+                context.user_data['awaiting_wire_length'] = False
+                await show_order_summary(update.callback_query, context)
+            else:
+                await update.message.reply_text("❌ لطفاً عددی بین 40 تا 500 وارد کنید.")
+        except ValueError:
+            await update.message.reply_text("❌ فقط عدد معتبر وارد کنید.")
+
+    elif 'awaiting_quantity' in context.user_data and context.user_data['awaiting_quantity']:
+        try:
+            quantity = int(update.message.text.strip())
+            if quantity > 0:
+                context.user_data['quantity'] = quantity
+                context.user_data['awaiting_quantity'] = False
+                await show_order_summary(update.callback_query, context)
+            else:
+                await update.message.reply_text("❌ لطفاً یک عدد مثبت وارد کنید.")
+        except ValueError:
+            await update.message.reply_text("❌ فقط عدد وارد کنید.")
+
+# --- هندلر عکس ---
+async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if 'awaiting_receipt' in context.user_data and context.user_data['awaiting_receipt']:
+        photo = update.message.photo[-1]
+        receipt_text = f"""📸 رسید پرداخت جدید
+🆔 شناسه کاربر: {update.effective_user.id}
+👤 نام کاربر: {update.effective_user.first_name}"""
+        try:
+            await context.bot.send_photo(
+                chat_id=-1002591533364,
+                photo=photo.file_id,
+                caption=receipt_text
+            )
+            await update.message.reply_text(
+                "✅ رسید پرداخت شما با موفقیت ثبت شد.\nکارشناسان ما به زودی آن را بررسی خواهند کرد.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 بازگشت به منوی اصلی", callback_data='back_main')]])
+            )
+            context.user_data['awaiting_receipt'] = False
+        except Exception as e:
+            logging.error(f"❌ خطای ارسال رسید: {e}")
+            await update.message.reply_text("❌ متأسفانه در ثبت رسید خطایی رخ داد. لطفاً دوباره تلاش کنید.")
+
+# --- وب سرور ساده برای نگه داشتن ربات زنده ---
+flask_app = Flask('')
+
+@flask_app.route('/')
+def home():
+    return "ربات ولتا استور در حال اجراست! 🚀"
+
+def run_flask():
+    flask_app.run(host='0.0.0.0', port=8080)
+
+# --- اجرای ربات ---
+if __name__ == '__main__':
+    # راه‌اندازی وب سرور در پس‌زمینه
+    t = threading.Thread(target=run_flask)
+    t.start()
+
+    # ساخت و اجرای ربات
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
+
+    print("🚀 ربات در حال اجرا است...")
+    application.run_polling()
