@@ -18,7 +18,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# --- توکن از محیط بگیر ---
+# --- توکن از محیط بگیر (حتماً در Render تنظیم شود) ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ متغیر محیطی BOT_TOKEN تنظیم نشده است!")
@@ -346,21 +346,24 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ متأسفانه در ثبت رسید خطایی رخ داد. لطفاً دوباره تلاش کنید.")
 
 # --- وب سرور ساده برای نگه داشتن ربات زنده ---
-app = Flask('')
+flask_app = Flask('')
 
-@app.route('/')
+@flask_app.route('/')
 def home():
     return "ربات ولتا استور در حال اجراست! 🚀"
 
-def run():
-    app.run(host='0.0.0.0', port=8080)
+def run_flask():
+    flask_app.run(host='0.0.0.0', port=8080)
 
 # --- اجرای ربات ---
 if __name__ == '__main__':
-    t = threading.Thread(target=run)
+    # راه‌اندازی وب سرور در پس‌زمینه
+    t = threading.Thread(target=run_flask)
     t.start()
 
+    # ساخت و اجرای ربات
     application = ApplicationBuilder().token(BOT_TOKEN).build()
+
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
