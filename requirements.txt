@@ -2,4 +2,4 @@ python-telegram-bot==20.8
 flask
 fpdf2
 arabic-reshaper
-bidi
+python-bidi
