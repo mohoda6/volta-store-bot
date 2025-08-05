@@ -4,4 +4,5 @@ fpdf2
 arabic-reshaper
 python-bidi
 pillow
-pytz  # اضافه شده برای زمان تهران
+pytz
+jdatetime  # برای تاریخ شمسی
