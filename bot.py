@@ -24,6 +24,15 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ متغیر محیطی BOT_TOKEN تنظیم نشده است!")
 
+# بالای فایل، اضافه کن
+from datetime import datetime
+import pytz
+
+def get_tehran_time():
+    tehran_tz = pytz.timezone('Asia/Tehran')
+    return datetime.now(tehran_tz)
+
+
 # --- جدول قیمت‌ها ---
 PRICES = {
     'sensor_type': {
@@ -603,6 +612,8 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"❌ خطای ارسال رسید: {e}")
             await update.message.reply_text("❌ متأسفانه در ثبت رسید خطایی رخ داد. لطفاً دوباره تلاش کنید.")
 
+
+
 # --- ساخت PDF پیش‌فاکتور ---
 from fpdf import FPDF
 import arabic_reshaper
@@ -610,7 +621,6 @@ from bidi.algorithm import get_display
 from PIL import Image, ImageEnhance
 import os
 
-# مسیر فونت و لوگو
 FONT_PATH = 'Vazirmatn-Regular.ttf'
 LOGO_PATH = 'volta_store_logo.png'
 
@@ -624,29 +634,35 @@ def create_invoice_pdf(context, user_name, user_id):
         raise FileNotFoundError("فایل فونت Vazirmatn-Regular.ttf یافت نشد. لطفاً فونت رو در پوشه اصلی قرار بدید.")
 
     # افزودن فونت فارسی
-    pdf.add_font('Vazir', '', FONT_PATH)  # بدون uni=True
-    pdf.set_font('Vazir', size=12)
+    pdf.add_font('Vazir', '', FONT_PATH)
+    pdf.set_font('Vazir', size=14)  # فونت اصلی درشت‌تر
 
-    # --- اضافه کردن watermark (لوگو) ---
+    # --- اضافه کردن watermark (لوگو با شفافیت بالا) ---
     if os.path.exists(LOGO_PATH):
-        logo = Image.open(LOGO_PATH)
-        enhancer = ImageEnhance.Brightness(logo)
-        logo = enhancer.enhance(0.3)  # کمرنگی 70%
-        temp_logo_path = 'temp_watermark.png'
-        logo.save(temp_logo_path)
-        pdf.image(temp_logo_path, x=50, y=80, w=110, h=110)
-        os.remove(temp_logo_path)
+        try:
+            logo = Image.open(LOGO_PATH).convert("RGBA")
+            # ایجاد نسخه کمرنگ (شفاف)
+            alpha = logo.split()[3]
+            alpha = ImageEnhance.Brightness(alpha).enhance(0.1)  # شفافیت بالا
+            logo.putalpha(alpha)
+            temp_logo_path = 'temp_watermark.png'
+            logo.save(temp_logo_path, format='PNG')
+            # اضافه کردن با شفافیت
+            pdf.image(temp_logo_path, x=50, y=80, w=110, h=110, opacity=0.15)
+            os.remove(temp_logo_path)
+        except Exception as e:
+            print(f"⚠️ مشکل در افزودن لوگو: {e}")
 
     # --- سربرگ (هدر) ---
     pdf.set_fill_color(0, 120, 215)  # آبی کاربنی
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font('Vazir', '', 18)  # ✅ فقط عادی، نه Bold
+    pdf.set_font('Vazir', '', 18)  # بدون Bold
     pdf.cell(0, 20, txt=get_display(arabic_reshaper.reshape("پیش‌فاکتور سفارش")), ln=True, align='C', fill=True)
     pdf.ln(5)
 
     # --- اطلاعات فروشگاه ---
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font('Vazir', size=10)
+    pdf.set_font('Vazir', size=12)
     shop_info = "ولتا استور | فروشگاه تخصصی سنسورهای صنعتی"
     reshaped_shop = get_display(arabic_reshaper.reshape(shop_info))
     pdf.cell(0, 8, txt=reshaped_shop, ln=True, align='C')
@@ -662,8 +678,8 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.ln(5)
 
     # --- اطلاعات فاکتور ---
-    pdf.set_font('Vazir', size=12)
-    now = datetime.now().strftime("%Y/%m/%d - %H:%M")
+    pdf.set_font('Vazir', size=14)
+    now = get_tehran_time().strftime("%Y/%m/%d - %H:%M")
     factor_number = f"شماره فاکتور: {user_id}-{now.split('-')[0].replace('/', '')}"
     reshaped_factor = get_display(arabic_reshaper.reshape(factor_number))
     pdf.cell(0, 8, txt=reshaped_factor, ln=True, align='R')
@@ -683,8 +699,15 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.multi_cell(0, 8, txt=reshaped_customer, align='R')
     pdf.ln(5)
 
-    # --- اطلاعات سفارش ---
-    pdf.set_font('Vazir', size=13)
+    # --- جدول سفارش (با خطوط زیبا) ---
+    pdf.set_fill_color(240, 240, 240)
+    pdf.set_draw_color(200, 200, 200)
+    pdf.set_font('Vazir', size=14)
+
+    # هدر جدول
+    pdf.cell(60, 12, "مشخصه", border=1, align="R", fill=True)
+    pdf.cell(100, 12, "مقدار", border=1, align="R", fill=True, ln=True)
+
     items = [
         ("نوع سنسور", context.user_data.get('sensor_type', 'نامشخص')),
         ("ابعاد غلاف", context.user_data.get('dimensions', 'نامشخص')),
@@ -693,22 +716,25 @@ def create_invoice_pdf(context, user_name, user_id):
         ("قیمت کل", f"{calculate_price(context):,} تومان" if calculate_price(context) else "نامشخص")
     ]
 
+    pdf.set_fill_color(255, 255, 255)
+    pdf.set_font('Vazir', size=14)
     for label, value in items:
         reshaped_label = get_display(arabic_reshaper.reshape(label))
         reshaped_value = get_display(arabic_reshaper.reshape(str(value)))
-        pdf.cell(0, 10, txt=f"{reshaped_label}: {reshaped_value}", ln=True, align='R')
+        pdf.cell(60, 10, reshaped_label, border=1, align="R")
+        pdf.cell(100, 10, reshaped_value, border=1, align="R", ln=True)
 
     # --- فوتر ---
     pdf.ln(10)
     footer1 = "با تشکر از اعتماد شما به ولتا استور"
     footer2 = "سفارش شما در دسترسی است و به زودی پیگیری می‌شود."
 
-    pdf.set_font('Vazir', '', 12)  # ✅ فقط عادی، نه Bold
+    pdf.set_font('Vazir', '', 14)
     pdf.set_text_color(0, 120, 215)
     pdf.cell(0, 10, txt=get_display(arabic_reshaper.reshape(footer1)), ln=True, align='C')
 
     pdf.set_text_color(100, 100, 100)
-    pdf.set_font('Vazir', size=10)
+    pdf.set_font('Vazir', size=12)
     pdf.cell(0, 8, txt=get_display(arabic_reshaper.reshape(footer2)), ln=True, align='C')
 
     # --- ذخیره فایل ---
@@ -743,4 +769,5 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
 
