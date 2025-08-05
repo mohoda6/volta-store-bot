@@ -273,16 +273,44 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🆔 شناسه کاربر: {query.from_user.id}"""
 
             try:
+                # ارسال به کاربر
                 payment_keyboard = [[InlineKeyboardButton("💳 نهایی‌سازی سفارش و پرداخت", callback_data='payment_info')]]
-                await query.edit_message_text(
-                    text=f"{order_details}\n✨ یک نسخه از سفارش به چت خصوصی شما ارسال شد.",
+                await context.bot.send_message(
+                    chat_id=query.from_user.id,
+                    text=order_details,
                     reply_markup=InlineKeyboardMarkup(payment_keyboard)
                 )
-                await context.bot.send_message(chat_id=query.from_user.id, text=order_details, reply_markup=InlineKeyboardMarkup(payment_keyboard))
+                # --- ساخت و ارسال PDF ---
+                user_name = query.from_user.full_name
+                user_id = query.from_user.id
+                try:
+                    pdf_path = create_invoice_pdf(context, user_name, user_id)
+                    await context.bot.send_document(
+                        chat_id=query.from_user.id,
+                        document=open(pdf_path, 'rb'),
+                        caption="📄 پیش‌فاکتور سفارش شما"
+                    )
+                    os.remove(pdf_path)  # پاک کردن فایل بعد از ارسال
+                except Exception as pdf_error:
+                    logging.error(f"❌ خطای ساخت PDF: {pdf_error}")
+                    await context.bot.send_message(
+                        chat_id=query.from_user.id,
+                        text="⚠️ در ایجاد پیش‌فاکتور مشکلی پیش آمد، اما سفارش شما ثبت شد."
+                    )
+
+                # ارسال به کانال
                 await context.bot.send_message(chat_id=-1002591533364, text=order_details)
+
+                # ویرایش پیام فعلی
+                await query.edit_message_text(
+                    text=f"{order_details}\n✨ سفارش و پیش‌فاکتور برای شما ارسال شد.",
+                    reply_markup=InlineKeyboardMarkup(payment_keyboard)
+                )
+                await query.answer("✅ سفارش و پیش‌فاکتور با موفقیت ارسال شد.")
+
             except Exception as e:
                 logging.error(f"❌ خطای ارسال: {e}")
-                await query.answer("⚠️ امکان ارسال پیام خصوصی وجود ندارد.", show_alert=True)
+                await query.answer("⚠️ خطایی در ارسال سفارش رخ داد.")
 
     # --- ماشین حساب تخمین قیمت ---
     elif data == 'calculator':
@@ -505,6 +533,66 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logging.error(f"❌ خطای ارسال رسید: {e}")
             await update.message.reply_text("❌ متأسفانه در ثبت رسید خطایی رخ داد. لطفاً دوباره تلاش کنید.")
+
+# --- ساخت PDF پیش‌فاکتور ---
+from fpdf import FPDF
+import arabic_reshaper
+from bidi.algorithm import get_display
+import os
+
+FONT_PATH = 'Vazir.ttf'
+
+def create_invoice_pdf(context, user_name, user_id):
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
+    pdf.add_page()
+
+    if not os.path.exists(FONT_PATH):
+        raise FileNotFoundError("فایل فونت Vazir.ttf یافت نشد. لطفاً فونت رو در پوشه اصلی قرار بدید.")
+
+    pdf.add_font('Vazir', '', FONT_PATH, uni=True)
+    pdf.set_font('Vazir', size=16)
+
+    # عنوان
+    title = "پیش‌فاکتور سفارش"
+    reshaped_title = get_display(arabic_reshaper.reshape(title))
+    pdf.cell(0, 15, txt=reshaped_title, ln=True, align='C')
+
+    # خط تیره
+    pdf.line(10, 30, 200, 30)
+    pdf.ln(10)
+
+    # جدول
+    pdf.set_font('Vazir', size=14)
+    pdf.cell(80, 10, "مشخصه", border=1, align="R")
+    pdf.cell(80, 10, "مقدار", border=1, align="R", ln=True)
+
+    items = [
+        ("نام مشتری", user_name),
+        ("شناسه کاربر", str(user_id)),
+        ("نوع سنسور", context.user_data.get('sensor_type', 'نامشخص')),
+        ("ابعاد غلاف", context.user_data.get('dimensions', 'نامشخص')),
+        ("طول سیم", f"{context.user_data.get('wire_length', 'نامشخص')} سانتی‌متر"),
+        ("تعداد", context.user_data.get('quantity', 'نامشخص')),
+        ("قیمت کل", f"{calculate_price(context):,} تومان" if calculate_price(context) else "نامشخص")
+    ]
+
+    for label, value in items:
+        reshaped_label = get_display(arabic_reshaper.reshape(label))
+        reshaped_value = get_display(arabic_reshaper.reshape(str(value)))
+        pdf.cell(80, 10, reshaped_label, border=1, align="R")
+        pdf.cell(80, 10, reshaped_value, border=1, align="R", ln=True)
+
+    # پایان
+    pdf.ln(10)
+    footer = "با تشکر از اعتماد شما به ولتا استور"
+    reshaped_footer = get_display(arabic_reshaper.reshape(footer))
+    pdf.set_font('Vazir', size=12)
+    pdf.cell(0, 10, txt=reshaped_footer, ln=True, align='C')
+
+    # ذخیره
+    filename = f"پیش_فاکتور_{user_id}.pdf"
+    pdf.output(filename)
+    return filename
 
 # --- وب سرور ساده برای نگه داشتن ربات زنده ---
 flask_app = Flask('')
