@@ -640,7 +640,7 @@ def create_invoice_pdf(context, user_name, user_id):
     # --- سربرگ (هدر) ---
     pdf.set_fill_color(0, 120, 215)  # آبی کاربنی
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font('Vazir', 'B', 18)
+    pdf.set_font('Vazir', '', 18)  # ✅ فقط عادی، نه Bold
     pdf.cell(0, 20, txt=get_display(arabic_reshaper.reshape("پیش‌فاکتور سفارش")), ln=True, align='C', fill=True)
     pdf.ln(5)
 
@@ -703,7 +703,7 @@ def create_invoice_pdf(context, user_name, user_id):
     footer1 = "با تشکر از اعتماد شما به ولتا استور"
     footer2 = "سفارش شما در دسترسی است و به زودی پیگیری می‌شود."
 
-    pdf.set_font('Vazir', 'B', 12)
+    pdf.set_font('Vazir', '', 12)  # ✅ فقط عادی، نه Bold
     pdf.set_text_color(0, 120, 215)
     pdf.cell(0, 10, txt=get_display(arabic_reshaper.reshape(footer1)), ln=True, align='C')
 
@@ -715,6 +715,7 @@ def create_invoice_pdf(context, user_name, user_id):
     filename = f"پیش_فاکتور_{user_id}.pdf"
     pdf.output(filename)
     return filename
+
 
 # --- وب سرور ساده برای نگه داشتن ربات زنده ---
 flask_app = Flask('')
@@ -742,3 +743,4 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
