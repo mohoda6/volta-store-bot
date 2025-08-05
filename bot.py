@@ -12,6 +12,8 @@ from flask import Flask
 import threading
 import os
 from datetime import datetime
+import pytz
+from jdatetime import datetime as jdatetime
 
 # --- تنظیمات لاگ ---
 logging.basicConfig(
@@ -23,27 +25,6 @@ logging.basicConfig(
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("❌ متغیر محیطی BOT_TOKEN تنظیم نشده است!")
-
-#ساعت 
-from datetime import datetime
-import pytz
-
-def get_tehran_time():
-    tehran_tz = pytz.timezone('Asia/Tehran')
-    return datetime.now(tehran_tz)
-
-# تاریخ
-from datetime import datetime
-import pytz
-from jdatetime import datetime as jdatetime
-
-# تابع دریافت زمان به وقت تهران و تبدیل به شمسی
-def get_tehran_time():
-    tehran_tz = pytz.timezone('Asia/Tehran')
-    now = datetime.now(tehran_tz)
-    j_now = jdatetime.fromgregorian(datetime=now)
-    return f"{j_now.strftime('%Y/%m/%d')} - {now.strftime('%H:%M')}"
-
 
 # --- جدول قیمت‌ها ---
 PRICES = {
@@ -624,6 +605,12 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"❌ خطای ارسال رسید: {e}")
             await update.message.reply_text("❌ متأسفانه در ثبت رسید خطایی رخ داد. لطفاً دوباره تلاش کنید.")
 
+# --- تابع کمکی: دریافت زمان به وقت تهران و شمسی ---
+def get_tehran_time():
+    tehran_tz = pytz.timezone('Asia/Tehran')
+    now = datetime.now(tehran_tz)
+    j_now = jdatetime.fromgregorian(datetime=now)
+    return f"{j_now.strftime('%Y/%m/%d')} - {now.strftime('%H:%M')}"
 
 # --- ساخت PDF پیش‌فاکتور ---
 from fpdf import FPDF
@@ -632,6 +619,7 @@ from bidi.algorithm import get_display
 from PIL import Image, ImageEnhance
 import os
 
+# مسیر فونت و لوگو
 FONT_PATH = 'Vazirmatn-Regular.ttf'
 LOGO_PATH = 'volta_store_logo.png'
 
@@ -646,26 +634,26 @@ def create_invoice_pdf(context, user_name, user_id):
 
     # افزودن فونت فارسی
     pdf.add_font('Vazir', '', FONT_PATH)
-    pdf.set_font('Vazir', size=16)  # فونت اصلی بزرگ‌تر
+    pdf.set_font('Vazir', size=16)
 
-    # --- اضافه کردن watermark (لوگو با شفافیت بالا) ---
+    # --- اضافه کردن watermark (لوگو کمرنگ در پس‌زمینه) ---
     if os.path.exists(LOGO_PATH):
         try:
             logo = Image.open(LOGO_PATH).convert("RGBA")
             alpha = logo.split()[3]
-            alpha = ImageEnhance.Brightness(alpha).enhance(0.1)  # شفافیت بالا
+            alpha = ImageEnhance.Brightness(alpha).enhance(0.05)
             logo.putalpha(alpha)
             temp_logo_path = 'temp_watermark.png'
             logo.save(temp_logo_path, format='PNG')
-            pdf.image(temp_logo_path, x=50, y=80, w=110, h=110, opacity=0.12)
+            pdf.image(temp_logo_path, x=50, y=80, w=110, h=110, opacity=0.1)
             os.remove(temp_logo_path)
         except Exception as e:
             print(f"⚠️ مشکل در افزودن لوگو: {e}")
 
     # --- سربرگ (هدر) ---
-    pdf.set_fill_color(0, 120, 215)  # آبی کاربنی
+    pdf.set_fill_color(0, 120, 215)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font('Vazir', '', 20)  # بدون Bold
+    pdf.set_font('Vazir', '', 20)
     pdf.cell(0, 20, txt=get_display(arabic_reshaper.reshape("پیش‌فاکتور سفارش")), ln=True, align='C', fill=True)
     pdf.ln(5)
 
@@ -708,15 +696,23 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.multi_cell(0, 8, txt=reshaped_customer, align='R')
     pdf.ln(5)
 
-    # --- جدول سفارش (ستون‌ها معکوس: مقدار سمت چپ، مشخصه سمت راست) ---
-    pdf.set_fill_color(0, 120, 215)  # آبی کاربنی
+    # --- جدول سفارش ---
+    col1_width = 100  # مقدار
+    col2_width = 60   # مشخصه
+    total_width = col1_width + col2_width
+
+    # هدر جدول
+    pdf.set_fill_color(0, 120, 215)
     pdf.set_text_color(255, 255, 255)
     pdf.set_draw_color(0, 120, 215)
-    pdf.set_font('Vazir', '', 16)  # بدون Bold
+    pdf.set_font('Vazir', '', 16)
+    pdf.cell(col1_width, 12, "مقدار", border=1, align="R", fill=True)
+    pdf.cell(col2_width, 12, "مشخصه", border=1, align="R", fill=True, ln=True)
 
-    # هدر جدول (معکوس)
-    pdf.cell(100, 12, "مقدار", border=1, align="R", fill=True)
-    pdf.cell(60, 12, "مشخصه", border=1, align="R", fill=True, ln=True)
+    # داده‌ها
+    pdf.set_fill_color(255, 255, 255)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Vazir', size=16)
 
     items = [
         ("نوع سنسور", context.user_data.get('sensor_type', 'نامشخص')),
@@ -726,15 +722,11 @@ def create_invoice_pdf(context, user_name, user_id):
         ("قیمت کل", f"{calculate_price(context):,} تومان" if calculate_price(context) else "نامشخص")
     ]
 
-    pdf.set_fill_color(255, 255, 255)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font('Vazir', size=16)
     for label, value in items:
         reshaped_label = get_display(arabic_reshaper.reshape(label))
         reshaped_value = get_display(arabic_reshaper.reshape(str(value)))
-        # معکوس: اول مقدار، بعد مشخصه
-        pdf.cell(100, 10, reshaped_value, border=1, align="R")
-        pdf.cell(60, 10, reshaped_label, border=1, align="R", ln=True)
+        pdf.cell(col1_width, 12, reshaped_value, border=1, align="R")
+        pdf.cell(col2_width, 12, reshaped_label, border=1, align="R", ln=True)
 
     # --- فوتر ---
     pdf.ln(10)
@@ -780,6 +772,3 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
-
-
-
