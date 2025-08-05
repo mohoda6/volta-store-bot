@@ -11,6 +11,7 @@ from telegram.ext import (
 from flask import Flask
 import threading
 import os
+from datetime import datetime
 
 # --- تنظیمات لاگ ---
 logging.basicConfig(
@@ -263,14 +264,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if final_price is None:
                 await query.answer("⚠️ خطایی در محاسبه قیمت رخ داد.")
                 return
+
+            # دریافت اطلاعات مشتری
+            customer_first_name = context.user_data.get('customer_first_name', 'نامشخص')
+            customer_last_name = context.user_data.get('customer_last_name', 'نامشخص')
+            customer_phone = context.user_data.get('customer_phone', 'نامشخص')
+
             order_details = f"""✅ سفارش جدید با مشخصات زیر ثبت شد:
 - نوع سنسور: {context.user_data.get('sensor_type')}
 - ابعاد غلاف: {context.user_data.get('dimensions')}
 - طول سیم: {context.user_data.get('wire_length')} سانتی‌متر
 - تعداد: {context.user_data.get('quantity')} عدد
 💰 قیمت کل: {final_price:,} تومان
-📱 برای نهایی کردن سفارش با @admin در تماس باشید.
-🆔 شناسه کاربر: {query.from_user.id}"""
+📱 برای نهایی کردن سفارش با @admin در تماس باشید."""
 
             try:
                 # ارسال به کاربر
@@ -280,6 +286,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text=order_details,
                     reply_markup=InlineKeyboardMarkup(payment_keyboard)
                 )
+
                 # --- ساخت و ارسال PDF ---
                 user_name = query.from_user.full_name
                 user_id = query.from_user.id
@@ -290,7 +297,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         document=open(pdf_path, 'rb'),
                         caption="📄 پیش‌فاکتور سفارش شما"
                     )
-                    os.remove(pdf_path)  # پاک کردن فایل بعد از ارسال
+                    os.remove(pdf_path)
                 except Exception as pdf_error:
                     logging.error(f"❌ خطای ساخت PDF: {pdf_error}")
                     await context.bot.send_message(
@@ -538,37 +545,86 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from fpdf import FPDF
 import arabic_reshaper
 from bidi.algorithm import get_display
+from PIL import Image, ImageEnhance
 import os
 
-FONT_PATH = 'Vazir.ttf'
+# مسیر فونت
+FONT_PATH = 'Vazirmatn-Regular.ttf'  # یا Vazir.ttf
+LOGO_PATH = 'volta_store_logo.png'  # لوگو برای watermark
 
 def create_invoice_pdf(context, user_name, user_id):
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
 
+    # بررسی وجود فونت
     if not os.path.exists(FONT_PATH):
-        raise FileNotFoundError("فایل فونت Vazir.ttf یافت نشد. لطفاً فونت رو در پوشه اصلی قرار بدید.")
+        raise FileNotFoundError("فایل فونت Vazirmatn-Regular.ttf یافت نشد. لطفاً فونت رو در پوشه اصلی قرار بدید.")
 
+    # افزودن فونت فارسی
     pdf.add_font('Vazir', '', FONT_PATH, uni=True)
-    pdf.set_font('Vazir', size=16)
+    pdf.set_font('Vazir', size=12)
 
-    # عنوان
-    title = "پیش‌فاکتور سفارش"
-    reshaped_title = get_display(arabic_reshaper.reshape(title))
-    pdf.cell(0, 15, txt=reshaped_title, ln=True, align='C')
+    # --- اضافه کردن watermark (لوگو) ---
+    if os.path.exists(LOGO_PATH):
+        logo = Image.open(LOGO_PATH)
+        enhancer = ImageEnhance.Brightness(logo)
+        logo = enhancer.enhance(0.3)  # کمرنگی 70%
+        temp_logo_path = 'temp_watermark.png'
+        logo.save(temp_logo_path)
+        # قرار دادن لوگو به صورت واترمارک در مرکز
+        pdf.image(temp_logo_path, x=50, y=80, w=110, h=110)
+        os.remove(temp_logo_path)
 
-    # خط تیره
-    pdf.line(10, 30, 200, 30)
+    # --- سربرگ (هدر) ---
+    pdf.set_fill_color(0, 120, 215)  # آبی کاربنی
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Vazir', 'B', 18)
+    pdf.cell(0, 20, txt=get_display(arabic_reshaper.reshape("پیش‌فاکتور سفارش")), ln=True, align='C', fill=True)
+    pdf.ln(5)
+
+    # --- اطلاعات فروشگاه ---
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Vazir', size=10)
+    shop_info = "ولتا استور | فروشگاه تخصصی سنسورهای صنعتی"
+    reshaped_shop = get_display(arabic_reshaper.reshape(shop_info))
+    pdf.cell(0, 8, txt=reshaped_shop, ln=True, align='C')
+
+    contact_info = "تلفن: 09359636526 | تهران، سه راه مرزداران"
+    reshaped_contact = get_display(arabic_reshaper.reshape(contact_info))
+    pdf.cell(0, 8, txt=reshaped_contact, ln=True, align='C')
     pdf.ln(10)
 
-    # جدول
-    pdf.set_font('Vazir', size=14)
-    pdf.cell(80, 10, "مشخصه", border=1, align="R")
-    pdf.cell(80, 10, "مقدار", border=1, align="R", ln=True)
+    # --- خط جداکننده ---
+    pdf.set_draw_color(0, 120, 215)
+    pdf.line(10, 45, 200, 45)
+    pdf.ln(5)
 
+    # --- اطلاعات فاکتور ---
+    pdf.set_font('Vazir', size=12)
+    now = datetime.now().strftime("%Y/%m/%d - %H:%M")
+    factor_number = f"شماره فاکتور: {user_id}-{now.split('-')[0].replace('/', '')}"
+    reshaped_factor = get_display(arabic_reshaper.reshape(factor_number))
+    pdf.cell(0, 8, txt=reshaped_factor, ln=True, align='R')
+
+    date_text = f"تاریخ: {now}"
+    reshaped_date = get_display(arabic_reshaper.reshape(date_text))
+    pdf.cell(0, 8, txt=reshaped_date, ln=True, align='R')
+    pdf.ln(5)
+
+    # --- اطلاعات مشتری ---
+    customer_first_name = context.user_data.get('customer_first_name', 'نامشخص')
+    customer_last_name = context.user_data.get('customer_last_name', 'نامشخص')
+    customer_phone = context.user_data.get('customer_phone', 'نامشخص')
+
+    customer_info = f"نام: {customer_first_name} {customer_last_name}\nشماره تماس: {customer_phone}"
+    reshaped_customer = get_display(arabic_reshaper.reshape(customer_info))
+    pdf.multi_cell(0, 8, txt=reshaped_customer, align='R')
+    pdf.ln(5)
+
+    # --- اطلاعات سفارش ---
+    pdf.set_font('Vazir', size=13)
     items = [
-        ("نام مشتری", user_name),
-        ("شناسه کاربر", str(user_id)),
         ("نوع سنسور", context.user_data.get('sensor_type', 'نامشخص')),
         ("ابعاد غلاف", context.user_data.get('dimensions', 'نامشخص')),
         ("طول سیم", f"{context.user_data.get('wire_length', 'نامشخص')} سانتی‌متر"),
@@ -579,17 +635,22 @@ def create_invoice_pdf(context, user_name, user_id):
     for label, value in items:
         reshaped_label = get_display(arabic_reshaper.reshape(label))
         reshaped_value = get_display(arabic_reshaper.reshape(str(value)))
-        pdf.cell(80, 10, reshaped_label, border=1, align="R")
-        pdf.cell(80, 10, reshaped_value, border=1, align="R", ln=True)
+        pdf.cell(0, 10, txt=f"{reshaped_label}: {reshaped_value}", ln=True, align='R')
 
-    # پایان
+    # --- فوتر ---
     pdf.ln(10)
-    footer = "با تشکر از اعتماد شما به ولتا استور"
-    reshaped_footer = get_display(arabic_reshaper.reshape(footer))
-    pdf.set_font('Vazir', size=12)
-    pdf.cell(0, 10, txt=reshaped_footer, ln=True, align='C')
+    footer1 = "با تشکر از اعتماد شما به ولتا استور"
+    footer2 = "سفارش شما با موفقیت ثبت شد جهت نهایی سازی سفارش خود لطفا اقدام به پرداخت آن نمایید"
 
-    # ذخیره
+    pdf.set_font('Vazir', 'B', 12)
+    pdf.set_text_color(0, 120, 215)
+    pdf.cell(0, 10, txt=get_display(arabic_reshaper.reshape(footer1)), ln=True, align='C')
+
+    pdf.set_text_color(100, 100, 100)
+    pdf.set_font('Vazir', size=10)
+    pdf.cell(0, 8, txt=get_display(arabic_reshaper.reshape(footer2)), ln=True, align='C')
+
+    # --- ذخیره فایل ---
     filename = f"پیش_فاکتور_{user_id}.pdf"
     pdf.output(filename)
     return filename
