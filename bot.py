@@ -504,8 +504,28 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             context.user_data['customer_phone'] = phone
             context.user_data['awaiting_customer_phone'] = False
-            # بازگشت به منوی سفارش
-            await show_order_summary(update.callback_query, context)
+
+            # ارسال دوباره منوی سفارش (به جای استفاده از query)
+            order_text = """📋 مشخصات سفارش شما:
+🎯 نوع سنسور: {}
+📐 ابعاد غلاف: {}
+📏 طول سیم: {}
+🔢 تعداد: {}""".format(
+                f"✨ {context.user_data.get('sensor_type')}" if context.user_data.get('sensor_type') else "❌ انتخاب نشده",
+                f"✨ {context.user_data.get('dimensions')}" if context.user_data.get('dimensions') else "❌ انتخاب نشده",
+                f"✨ {context.user_data.get('wire_length')} سانتی‌متر" if context.user_data.get('wire_length') else "❌ انتخاب نشده",
+                f"✨ {context.user_data.get('quantity')} عدد" if context.user_data.get('quantity') else "❌ انتخاب نشده"
+            )
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🎯 انتخاب نوع سنسور", callback_data='select_sensor_type')],
+                [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
+                [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
+                [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
+                [InlineKeyboardButton("📞 اطلاعات تماس", callback_data='enter_contact_info')],
+                [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
+                [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
+            ])
+            await update.message.reply_text(text=order_text, reply_markup=reply_markup)
 
     # --- ورود طول کابل برای ماشین حساب ---
     elif 'awaiting_calc_length' in context.user_data and context.user_data['awaiting_calc_length']:
@@ -604,7 +624,7 @@ def create_invoice_pdf(context, user_name, user_id):
         raise FileNotFoundError("فایل فونت Vazirmatn-Regular.ttf یافت نشد. لطفاً فونت رو در پوشه اصلی قرار بدید.")
 
     # افزودن فونت فارسی
-    pdf.add_font('Vazir', '', FONT_PATH, uni=True)
+    pdf.add_font('Vazir', '', FONT_PATH)  # بدون uni=True
     pdf.set_font('Vazir', size=12)
 
     # --- اضافه کردن watermark (لوگو) ---
