@@ -612,15 +612,6 @@ def get_tehran_time():
     j_now = jdatetime.fromgregorian(datetime=now)
     return f"{j_now.strftime('%Y/%m/%d')} - {now.strftime('%H:%M')}"
 
-# در ابتدای تابع create_invoice_pdf
-print("🔍 بررسی وجود فایل‌ها...")
-print(f"فونت موجود است: {os.path.exists(FONT_PATH)}")
-print(f"لوگو موجود است: {os.path.exists(LOGO_PATH)}")
-
-if not os.path.exists(FONT_PATH):
-    print("❌ فایل فونت پیدا نشد!")
-if not os.path.exists(LOGO_PATH):
-    print("❌ فایل لوگو پیدا نشد!")
 
 # --- ساخت PDF پیش‌فاکتور ---
 from fpdf import FPDF
@@ -782,4 +773,5 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
 
