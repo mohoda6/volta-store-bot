@@ -1,4 +1,8 @@
 import logging
+import os
+from datetime import datetime
+import pytz
+from jdatetime import datetime as jdatetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -9,11 +13,11 @@ from telegram.ext import (
     filters
 )
 from flask import Flask
+from fpdf import FPDF
+import arabic_reshaper
+from bidi.algorithm import get_display
+from PIL import Image, ImageEnhance
 import threading
-import os
-from datetime import datetime
-import pytz
-from jdatetime import datetime as jdatetime
 
 # --- تنظیمات لاگ ---
 logging.basicConfig(
@@ -55,6 +59,17 @@ def calculate_price(context):
     except Exception as e:
         logging.error(f"❌ خطای محاسبه قیمت: {e}")
         return None
+
+# --- تابع کمکی: دریافت زمان به وقت تهران و شمسی ---
+def get_tehran_time():
+    tehran_tz = pytz.timezone('Asia/Tehran')
+    now = datetime.now(tehran_tz)
+    j_now = jdatetime.fromgregorian(datetime=now)
+    return f"{j_now.strftime('%Y/%m/%d')} - {now.strftime('%H:%M')}"
+
+# --- مسیر فونت و لوگو ---
+FONT_PATH = 'Vazirmatn-Regular.ttf'
+LOGO_PATH = 'volta_store_logo.png'
 
 # --- منوها ---
 main_menu = [
@@ -507,7 +522,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['customer_phone'] = phone
             context.user_data['awaiting_customer_phone'] = False
 
-            # ارسال دوباره منوی سفارش (به جای استفاده از query)
+            # ارسال دوباره منوی سفارش
             order_text = """📋 مشخصات سفارش شما:
 🎯 نوع سنسور: {}
 📐 ابعاد غلاف: {}
@@ -605,35 +620,23 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"❌ خطای ارسال رسید: {e}")
             await update.message.reply_text("❌ متأسفانه در ثبت رسید خطایی رخ داد. لطفاً دوباره تلاش کنید.")
 
-# --- تابع کمکی: دریافت زمان به وقت تهران و شمسی ---
-def get_tehran_time():
-    tehran_tz = pytz.timezone('Asia/Tehran')
-    now = datetime.now(tehran_tz)
-    j_now = jdatetime.fromgregorian(datetime=now)
-    return f"{j_now.strftime('%Y/%m/%d')} - {now.strftime('%H:%M')}"
-
-
 # --- ساخت PDF پیش‌فاکتور ---
-from fpdf import FPDF
-import arabic_reshaper
-from bidi.algorithm import get_display
-from PIL import Image, ImageEnhance
-import os
-
-# مسیر فونت و لوگو
-FONT_PATH = 'Vazirmatn-Regular.ttf'
-LOGO_PATH = 'volta_store_logo.png'
-
 def create_invoice_pdf(context, user_name, user_id):
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # بررسی وجود فونت
+    # --- بررسی وجود فونت و لوگو ---
+    print("🔍 بررسی وجود فایل‌ها...")
+    print(f"فونت موجود است: {os.path.exists(FONT_PATH)}")
+    print(f"لوگو موجود است: {os.path.exists(LOGO_PATH)}")
+
     if not os.path.exists(FONT_PATH):
         raise FileNotFoundError("فایل فونت Vazirmatn-Regular.ttf یافت نشد. لطفاً فونت رو در پوشه اصلی قرار بدید.")
+    if not os.path.exists(LOGO_PATH):
+        print("❌ فایل لوگو پیدا نشد! ولی ادامه می‌دهیم...")
 
-    # افزودن فونت فارسی
+    # --- افزودن فونت فارسی ---
     pdf.add_font('Vazir', '', FONT_PATH)
     pdf.set_font('Vazir', size=16)
 
@@ -652,7 +655,7 @@ def create_invoice_pdf(context, user_name, user_id):
             print(f"⚠️ مشکل در افزودن لوگو: {e}")
 
     # --- سربرگ (هدر) ---
-    pdf.set_fill_color(0, 120, 215)
+    pdf.set_fill_color(0, 120, 215)  # آبی کاربنی
     pdf.set_text_color(255, 255, 255)
     pdf.set_font('Vazir', '', 20)
     pdf.cell(0, 20, txt=get_display(arabic_reshaper.reshape("پیش‌فاکتور سفارش")), ln=True, align='C', fill=True)
@@ -700,10 +703,9 @@ def create_invoice_pdf(context, user_name, user_id):
     # --- جدول سفارش ---
     col1_width = 100  # مقدار
     col2_width = 60   # مشخصه
-    total_width = col1_width + col2_width
 
     # هدر جدول
-    pdf.set_fill_color(0, 120, 215)
+    pdf.set_fill_color(0, 120, 215)  # آبی کاربنی
     pdf.set_text_color(255, 255, 255)
     pdf.set_draw_color(0, 120, 215)
     pdf.set_font('Vazir', '', 16)
@@ -773,5 +775,3 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
-
-
