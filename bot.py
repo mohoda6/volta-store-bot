@@ -109,6 +109,7 @@ async def show_order_summary(query, context):
         [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
         [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
         [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
+        [InlineKeyboardButton("📞 اطلاعات تماس", callback_data='enter_contact_info')],
         [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
         [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
     ])
@@ -255,20 +256,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='order')]])
         )
 
+    # --- درخواست اطلاعات تماس ---
+    elif data == 'enter_contact_info':
+        context.user_data['awaiting_customer_name'] = True
+        await query.edit_message_text(
+            text="📝 لطفاً نام و نام خانوادگی خود را وارد کنید:",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='order')]])
+        )
+
     # --- ثبت نهایی سفارش ---
     elif data == 'final_order':
-        if not all(key in context.user_data for key in ['sensor_type', 'dimensions', 'wire_length', 'quantity']):
-            await query.answer("❌ لطفاً تمام موارد سفارش را تکمیل کنید.", show_alert=True)
+        required_keys = ['sensor_type', 'dimensions', 'wire_length', 'quantity', 'customer_first_name', 'customer_phone']
+        if not all(key in context.user_data for key in required_keys):
+            await query.answer("❌ لطفاً اطلاعات تماس را کامل کنید.", show_alert=True)
         else:
             final_price = calculate_price(context)
             if final_price is None:
                 await query.answer("⚠️ خطایی در محاسبه قیمت رخ داد.")
                 return
-
-            # دریافت اطلاعات مشتری
-            customer_first_name = context.user_data.get('customer_first_name', 'نامشخص')
-            customer_last_name = context.user_data.get('customer_last_name', 'نامشخص')
-            customer_phone = context.user_data.get('customer_phone', 'نامشخص')
 
             order_details = f"""✅ سفارش جدید با مشخصات زیر ثبت شد:
 - نوع سنسور: {context.user_data.get('sensor_type')}
@@ -305,8 +310,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         text="⚠️ در ایجاد پیش‌فاکتور مشکلی پیش آمد، اما سفارش شما ثبت شد."
                     )
 
-                # ارسال به کانال
-                await context.bot.send_message(chat_id=-1002591533364, text=order_details)
+                # ارسال به کانال (فقط یک بار)
+                if not context.user_data.get('order_sent_to_channel', False):
+                    await context.bot.send_message(chat_id=-1002591533364, text=order_details)
+                    context.user_data['order_sent_to_channel'] = True
 
                 # ویرایش پیام فعلی
                 await query.edit_message_text(
@@ -427,6 +434,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
                     [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
                     [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
+                    [InlineKeyboardButton("📞 اطلاعات تماس", callback_data='enter_contact_info')],
                     [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
                     [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
                 ])
@@ -460,6 +468,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("📐 انتخاب ابعاد غلاف", callback_data='select_dimensions')],
                     [InlineKeyboardButton("📍 طول سیم", callback_data='select_wire_length')],
                     [InlineKeyboardButton("🔢 تعداد", callback_data='select_quantity')],
+                    [InlineKeyboardButton("📞 اطلاعات تماس", callback_data='enter_contact_info')],
                     [InlineKeyboardButton("✅ ثبت نهایی سفارش", callback_data='final_order')],
                     [InlineKeyboardButton("🔙 بازگشت به منوی قبل", callback_data='back_products')]
                 ])
@@ -468,6 +477,35 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ لطفاً یک عدد مثبت وارد کنید.")
         except ValueError:
             await update.message.reply_text("❌ فقط عدد وارد کنید.")
+
+    # --- ورود نام مشتری ---
+    elif 'awaiting_customer_name' in context.user_data and context.user_data['awaiting_customer_name']:
+        name = update.message.text.strip()
+        if len(name) < 2:
+            await update.message.reply_text("❌ لطفاً یک نام معتبر وارد کنید.")
+        else:
+            parts = name.split()
+            first_name = parts[0]
+            last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+            context.user_data['customer_first_name'] = first_name
+            context.user_data['customer_last_name'] = last_name
+            context.user_data['awaiting_customer_name'] = False
+            context.user_data['awaiting_customer_phone'] = True
+            await update.message.reply_text(
+                "📞 لطفاً شماره تماس خود را (با 0) وارد کنید:",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='order')]])
+            )
+
+    # --- ورود شماره تماس ---
+    elif 'awaiting_customer_phone' in context.user_data and context.user_data['awaiting_customer_phone']:
+        phone = update.message.text.strip()
+        if not phone.startswith("0") or not phone.isdigit() or not (10 <= len(phone) <= 11):
+            await update.message.reply_text("❌ لطفاً یک شماره معتبر (مثلاً 09123456789) وارد کنید.")
+        else:
+            context.user_data['customer_phone'] = phone
+            context.user_data['awaiting_customer_phone'] = False
+            # بازگشت به منوی سفارش
+            await show_order_summary(update.callback_query, context)
 
     # --- ورود طول کابل برای ماشین حساب ---
     elif 'awaiting_calc_length' in context.user_data and context.user_data['awaiting_calc_length']:
@@ -527,11 +565,15 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🆔 شناسه کاربر: {update.effective_user.id}
 👤 نام کاربر: {update.effective_user.first_name}"""
         try:
-            await context.bot.send_photo(
-                chat_id=-1002591533364,
-                photo=photo.file_id,
-                caption=receipt_text
-            )
+            # جلوگیری از ارسال دوباره
+            if not context.user_data.get('receipt_sent', False):
+                await context.bot.send_photo(
+                    chat_id=-1002591533364,
+                    photo=photo.file_id,
+                    caption=receipt_text
+                )
+                context.user_data['receipt_sent'] = True
+
             await update.message.reply_text(
                 "✅ رسید پرداخت شما با موفقیت ثبت شد.\nکارشناسان ما به زودی آن را بررسی خواهند کرد.",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 بازگشت به منوی اصلی", callback_data='back_main')]])
@@ -548,9 +590,9 @@ from bidi.algorithm import get_display
 from PIL import Image, ImageEnhance
 import os
 
-# مسیر فونت
-FONT_PATH = 'Vazirmatn-Regular.ttf'  # یا Vazir.ttf
-LOGO_PATH = 'volta_store_logo.png'  # لوگو برای watermark
+# مسیر فونت و لوگو
+FONT_PATH = 'Vazirmatn-Regular.ttf'
+LOGO_PATH = 'volta_store_logo.png'
 
 def create_invoice_pdf(context, user_name, user_id):
     pdf = FPDF(orientation='P', unit='mm', format='A4')
@@ -572,7 +614,6 @@ def create_invoice_pdf(context, user_name, user_id):
         logo = enhancer.enhance(0.3)  # کمرنگی 70%
         temp_logo_path = 'temp_watermark.png'
         logo.save(temp_logo_path)
-        # قرار دادن لوگو به صورت واترمارک در مرکز
         pdf.image(temp_logo_path, x=50, y=80, w=110, h=110)
         os.remove(temp_logo_path)
 
@@ -614,7 +655,7 @@ def create_invoice_pdf(context, user_name, user_id):
 
     # --- اطلاعات مشتری ---
     customer_first_name = context.user_data.get('customer_first_name', 'نامشخص')
-    customer_last_name = context.user_data.get('customer_last_name', 'نامشخص')
+    customer_last_name = context.user_data.get('customer_last_name', '')
     customer_phone = context.user_data.get('customer_phone', 'نامشخص')
 
     customer_info = f"نام: {customer_first_name} {customer_last_name}\nشماره تماس: {customer_phone}"
@@ -640,7 +681,7 @@ def create_invoice_pdf(context, user_name, user_id):
     # --- فوتر ---
     pdf.ln(10)
     footer1 = "با تشکر از اعتماد شما به ولتا استور"
-    footer2 = "سفارش شما با موفقیت ثبت شد جهت نهایی سازی سفارش خود لطفا اقدام به پرداخت آن نمایید"
+    footer2 = "سفارش شما در دسترسی است و به زودی پیگیری می‌شود."
 
     pdf.set_font('Vazir', 'B', 12)
     pdf.set_text_color(0, 120, 215)
