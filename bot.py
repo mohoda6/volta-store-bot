@@ -640,17 +640,11 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.add_font('Vazir', '', FONT_PATH)
     pdf.set_font('Vazir', size=16)
 
-    # --- اضافه کردن watermark (لوگو کمرنگ در پس‌زمینه) ---
+    # --- اضافه کردن لوگو در گوشه سمت راست بالا ---
     if os.path.exists(LOGO_PATH):
         try:
-            logo = Image.open(LOGO_PATH).convert("RGBA")
-            alpha = logo.split()[3]
-            alpha = ImageEnhance.Brightness(alpha).enhance(0.05)
-            logo.putalpha(alpha)
-            temp_logo_path = 'temp_watermark.png'
-            logo.save(temp_logo_path, format='PNG')
-            pdf.image(temp_logo_path, x=50, y=80, w=110, h=110, opacity=0.1)
-            os.remove(temp_logo_path)
+            # لوگو رو در بالا و سمت راست قرار می‌دیم (x نزدیک به 150)
+            pdf.image(LOGO_PATH, x=150, y=10, w=40)  # w=40: عرض لوگو
         except Exception as e:
             print(f"⚠️ مشکل در افزودن لوگو: {e}")
 
@@ -748,7 +742,7 @@ def create_invoice_pdf(context, user_name, user_id):
     filename = f"پیش_فاکتور_{user_id}.pdf"
     pdf.output(filename)
     return filename
-
+    
 # --- وب سرور ساده برای نگه داشتن ربات زنده ---
 flask_app = Flask('')
 
@@ -775,3 +769,4 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
