@@ -346,8 +346,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- ماشین حساب تخمین قیمت ---
     elif data == 'calculator':
         keyboard = [
-            [InlineKeyboardButton("NTC 5K", callback_data='calc_sensor_12000')],
-            [InlineKeyboardButton("NTC 10K", callback_data='calc_sensor_15000')],
+            [InlineKeyboardButton("NTC 5K", callback_data='calc_sensor_5000')],
+            [InlineKeyboardButton("NTC 10K", callback_data='calc_sensor_12000')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='products')]
         ]
         await query.edit_message_text(
@@ -360,16 +360,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['calc_sensor_price'] = price
         await query.answer("نوع سنسور انتخاب شد")
         keyboard = [
-            [InlineKeyboardButton("25×4", callback_data='calc_sheath_10000')],
-            [InlineKeyboardButton("50×4", callback_data='calc_sheath_10500')],
-            [InlineKeyboardButton("100×4", callback_data='calc_sheath_11000')],
-            [InlineKeyboardButton("25×5", callback_data='calc_sheath_11500')],
-            [InlineKeyboardButton("50×50", callback_data='calc_sheath_12000')],
-            [InlineKeyboardButton("30×5", callback_data='calc_sheath_12500')],
-            [InlineKeyboardButton("30×6", callback_data='calc_sheath_13000')],
-            [InlineKeyboardButton("40×6", callback_data='calc_sheath_13500')],
-            [InlineKeyboardButton("50×6 سرتخت", callback_data='calc_sheath_14000')],
-            [InlineKeyboardButton("50×6 سرگرد", callback_data='calc_sheath_14500')],
+            [InlineKeyboardButton("25×4", callback_data='calc_sheath_11000')],
+            [InlineKeyboardButton("50×4", callback_data='calc_sheath_12000')],
+            [InlineKeyboardButton("100×4", callback_data='calc_sheath_34000')],
+            [InlineKeyboardButton("25×5", callback_data='calc_sheath_12000')],
+            [InlineKeyboardButton("50×5", callback_data='calc_sheath_13000')],
+            [InlineKeyboardButton("30×5", callback_data='calc_sheath_13000')],
+            [InlineKeyboardButton("30×6", callback_data='calc_sheath_10000')],
+            [InlineKeyboardButton("40×6", callback_data='calc_sheath_14000')],
+            [InlineKeyboardButton("50×6 سرتخت", callback_data='calc_sheath_19000')],
+            [InlineKeyboardButton("50×6 سرگرد", callback_data='calc_sheath_19000')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='calculator')]
         ]
         await query.edit_message_text(
@@ -692,29 +692,29 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.multi_cell(0, 8, txt=reshaped_customer, align='R')
     pdf.ln(5)
 
-    # --- جدول سفارش (کامل عرض، از لبه راست شروع میشه) ---
-    col1_width = 100  # مقدار
-    col2_width = 60   # مشخصه
-    # مجموعاً 160mm (از x=10 تا x=170)
+# --- جدول سفارش (کامل عرض، از لبه راست شروع میشه) ---
+col1_width = 100  # مقدار (سمت چپ جدول)
+col2_width = 60   # مشخصه (سمت راست جدول)
+# مجموعاً 160mm (از x=10 تا x=170) — فضای منطقی با حاشیه
 
-    # داده‌ها
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font('Vazir', size=16)
+# داده‌ها
+pdf.set_text_color(0, 0, 0)
+pdf.set_font('Vazir', size=16)
 
-    items = [
-        ("نوع سنسور", context.user_data.get('sensor_type', 'نامشخص')),
-        ("ابعاد غلاف", context.user_data.get('dimensions', 'نامشخص')),
-        ("طول سیم", f"{context.user_data.get('wire_length', 'نامشخص')} سانتی‌متر"),
-        ("تعداد", context.user_data.get('quantity', 'نامشخص')),
-        ("قیمت کل", f"{calculate_price(context):,} تومان" if calculate_price(context) else "نامشخص")
-    ]
+items = [
+    ("نوع سنسور", context.user_data.get('sensor_type', 'نامشخص')),
+    ("ابعاد غلاف", context.user_data.get('dimensions', 'نامشخص')),
+    ("طول سیم", f"{context.user_data.get('wire_length', 'نامشخص')} سانتی‌متر"),
+    ("تعداد", context.user_data.get('quantity', 'نامشخص')),
+    ("قیمت کل", f"{calculate_price(context):,} تومان" if calculate_price(context) else "نامشخص")
+]
 
-    for label, value in items:
-        reshaped_label = get_display(arabic_reshaper.reshape(label))
-        reshaped_value = get_display(arabic_reshaper.reshape(str(value)))
-        # اول "مقدار" (سمت چپ)، بعد "مشخصه" (سمت راست)
-        pdf.cell(col1_width, 12, reshaped_value, border=1, align="R")
-        pdf.cell(col2_width, 12, reshaped_label, border=1, align="R", ln=True)
+for label, value in items:
+    reshaped_label = get_display(arabic_reshaper.reshape(label))
+    reshaped_value = get_display(arabic_reshaper.reshape(str(value)))
+    # اول "مقدار" (سمت چپ)، بعد "مشخصه" (سمت راست)
+    pdf.cell(col1_width, 12, reshaped_value, border=1, align="R")
+    pdf.cell(col2_width, 12, reshaped_label, border=1, align="R", ln=True)
 
     # --- فوتر ---
     pdf.ln(10)
@@ -760,6 +760,7 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
 
 
 
