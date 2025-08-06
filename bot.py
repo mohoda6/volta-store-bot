@@ -626,42 +626,24 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # --- بررسی وجود فونت و لوگو ---
-    print("🔍 بررسی وجود فایل‌ها...")
-    print(f"فونت موجود است: {os.path.exists(FONT_PATH)}")
-    print(f"لوگو موجود است: {os.path.exists(LOGO_PATH)}")
-
+    # --- بررسی وجود فونت ---
     if not os.path.exists(FONT_PATH):
         raise FileNotFoundError("فایل فونت Vazirmatn-Regular.ttf یافت نشد. لطفاً فونت رو در پوشه اصلی قرار بدید.")
-    if not os.path.exists(LOGO_PATH):
-        print("❌ فایل لوگو پیدا نشد! ولی ادامه می‌دهیم...")
 
     # --- افزودن فونت فارسی ---
     pdf.add_font('Vazir', '', FONT_PATH)
     pdf.set_font('Vazir', size=16)
 
     # --- اضافه کردن لوگو به عنوان watermark در پس‌زمینه ---
-    if os.path.exists(LOGO_PATH):
+    WATERMARK_PATH = 'volta_store_logo_watermark.png'
+
+    if os.path.exists(WATERMARK_PATH):
         try:
-            from PIL import Image, ImageEnhance
-
-            # باز کردن لوگو و تنظیم شفافیت
-            logo = Image.open(LOGO_PATH).convert("RGBA")
-            alpha = logo.split()[3]
-            alpha = ImageEnhance.Brightness(alpha).enhance(0.15)  # کمرنگی مناسب
-            logo.putalpha(alpha)
-
-            # ذخیره موقت
-            temp_logo_path = 'temp_watermark.png'
-            logo.save(temp_logo_path, format='PNG')
-
-            # اضافه کردن به PDF با شفافیت و اندازه مناسب
-            pdf.image(temp_logo_path, x=50, y=80, w=110, h=110, opacity=0.15)
-
-            # حذف فایل موقت
-            os.remove(temp_logo_path)
+            pdf.image(WATERMARK_PATH, x=50, y=80, w=110, h=110)
         except Exception as e:
             print(f"⚠️ مشکل در افزودن watermark: {e}")
+    else:
+        print("❌ فایل لوگوی watermark پیدا نشد: 'volta_store_logo_watermark.png'")
 
     # --- سربرگ (هدر) ---
     pdf.set_fill_color(0, 120, 215)  # آبی کاربنی
@@ -784,6 +766,7 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
 
 
 
