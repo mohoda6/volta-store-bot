@@ -640,13 +640,28 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.add_font('Vazir', '', FONT_PATH)
     pdf.set_font('Vazir', size=16)
 
-    # --- اضافه کردن لوگو در گوشه سمت راست بالا ---
+    # --- اضافه کردن لوگو به عنوان watermark کمرنگ در پس‌زمینه ---
     if os.path.exists(LOGO_PATH):
         try:
-            # لوگو رو در بالا و سمت راست قرار می‌دیم (x نزدیک به 150)
-            pdf.image(LOGO_PATH, x=150, y=10, w=40)  # w=40: عرض لوگو
+            from PIL import Image, ImageEnhance
+
+            # باز کردن لوگو و ایجاد شفافیت
+            logo = Image.open(LOGO_PATH).convert("RGBA")
+            alpha = logo.split()[3]  # لایه آلفا
+            alpha = ImageEnhance.Brightness(alpha).enhance(0.05)  # کمرنگی بسیار بالا
+            logo.putalpha(alpha)
+
+            # ذخیره موقت با شفافیت
+            temp_logo_path = 'temp_watermark.png'
+            logo.save(temp_logo_path, format='PNG')
+
+            # اضافه کردن به PDF با موقعیت مرکزی و شفافیت
+            pdf.image(temp_logo_path, x=50, y=80, w=110, h=110, opacity=0.1)
+
+            # حذف فایل موقت
+            os.remove(temp_logo_path)
         except Exception as e:
-            print(f"⚠️ مشکل در افزودن لوگو: {e}")
+            print(f"⚠️ مشکل در افزودن watermark: {e}")
 
     # --- سربرگ (هدر) ---
     pdf.set_fill_color(0, 120, 215)  # آبی کاربنی
@@ -769,4 +784,5 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
 
