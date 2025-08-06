@@ -639,8 +639,8 @@ def create_invoice_pdf(context, user_name, user_id):
 
     if os.path.exists(WATERMARK_PATH):
         try:
-            # فقط اندازه رو بزرگ کنیم، بقیه تنظیمات مثل خود فایل بماند
-            pdf.image(WATERMARK_PATH, x=50, y=80, w=130, h=130)  # w و h افزایش یافته
+            # اندازه لوگو رو بزرگ‌تر کن (مثلاً 150x150)
+            pdf.image(WATERMARK_PATH, x=30, y=60, w=150, h=150)  # بزرگ‌تر و مرکز صفحه
         except Exception as e:
             print(f"⚠️ مشکل در افزودن watermark: {e}")
     else:
@@ -692,7 +692,7 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.multi_cell(0, 8, txt=reshaped_customer, align='R')
     pdf.ln(5)
 
-    # --- جدول سفارش (بدون هدر و کامل عرض) ---
+    # --- جدول سفارش (کامل عرض، از لبه راست شروع میشه) ---
     col1_width = 100  # مقدار
     col2_width = 60   # مشخصه
     # مجموعاً 160mm (از x=10 تا x=170)
@@ -712,6 +712,7 @@ def create_invoice_pdf(context, user_name, user_id):
     for label, value in items:
         reshaped_label = get_display(arabic_reshaper.reshape(label))
         reshaped_value = get_display(arabic_reshaper.reshape(str(value)))
+        # اول "مقدار" (سمت چپ)، بعد "مشخصه" (سمت راست)
         pdf.cell(col1_width, 12, reshaped_value, border=1, align="R")
         pdf.cell(col2_width, 12, reshaped_label, border=1, align="R", ln=True)
 
@@ -759,6 +760,7 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
 
 
 
