@@ -692,29 +692,29 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.multi_cell(0, 8, txt=reshaped_customer, align='R')
     pdf.ln(5)
 
-# --- جدول سفارش (کامل عرض، از لبه راست شروع میشه) ---
-col1_width = 100  # مقدار (سمت چپ جدول)
-col2_width = 60   # مشخصه (سمت راست جدول)
-# مجموعاً 160mm (از x=10 تا x=170) — فضای منطقی با حاشیه
+    # --- جدول سفارش (کامل عرض، از لبه راست شروع میشه) ---
+    col1_width = 100  # مقدار (سمت چپ جدول)
+    col2_width = 60   # مشخصه (سمت راست جدول)
+    # مجموعاً 160mm (از x=10 تا x=170) — فضای منطقی با حاشیه
 
-# داده‌ها
-pdf.set_text_color(0, 0, 0)
-pdf.set_font('Vazir', size=16)
+    # داده‌ها
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Vazir', size=16)
 
-items = [
-    ("نوع سنسور", context.user_data.get('sensor_type', 'نامشخص')),
-    ("ابعاد غلاف", context.user_data.get('dimensions', 'نامشخص')),
-    ("طول سیم", f"{context.user_data.get('wire_length', 'نامشخص')} سانتی‌متر"),
-    ("تعداد", context.user_data.get('quantity', 'نامشخص')),
-    ("قیمت کل", f"{calculate_price(context):,} تومان" if calculate_price(context) else "نامشخص")
-]
+    items = [
+        ("نوع سنسور", context.user_data.get('sensor_type', 'نامشخص')),
+        ("ابعاد غلاف", context.user_data.get('dimensions', 'نامشخص')),
+        ("طول سیم", f"{context.user_data.get('wire_length', 'نامشخص')} سانتی‌متر"),
+        ("تعداد", context.user_data.get('quantity', 'نامشخص')),
+        ("قیمت کل", f"{calculate_price(context):,} تومان" if calculate_price(context) else "نامشخص")
+    ]
 
-for label, value in items:
-    reshaped_label = get_display(arabic_reshaper.reshape(label))
-    reshaped_value = get_display(arabic_reshaper.reshape(str(value)))
-    # اول "مقدار" (سمت چپ)، بعد "مشخصه" (سمت راست)
-    pdf.cell(col1_width, 12, reshaped_value, border=1, align="R")
-    pdf.cell(col2_width, 12, reshaped_label, border=1, align="R", ln=True)
+    for label, value in items:
+        reshaped_label = get_display(arabic_reshaper.reshape(label))
+        reshaped_value = get_display(arabic_reshaper.reshape(str(value)))
+        # اول "مقدار" (سمت چپ)، بعد "مشخصه" (سمت راست)
+        pdf.cell(col1_width, 12, reshaped_value, border=1, align="R")
+        pdf.cell(col2_width, 12, reshaped_label, border=1, align="R", ln=True)
 
     # --- فوتر ---
     pdf.ln(10)
@@ -732,7 +732,7 @@ for label, value in items:
     # --- ذخیره فایل ---
     filename = f"پیش_فاکتور_{user_id}.pdf"
     pdf.output(filename)
-    return filename  # ✅ این خط باید داخل تابع باشه
+    return filename  # ✅ این خط داخل تابع است و درست است
     
 # --- وب سرور ساده برای نگه داشتن ربات زنده ---
 flask_app = Flask('')
@@ -760,6 +760,7 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
 
 
 
