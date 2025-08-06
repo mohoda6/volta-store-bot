@@ -640,23 +640,23 @@ def create_invoice_pdf(context, user_name, user_id):
     pdf.add_font('Vazir', '', FONT_PATH)
     pdf.set_font('Vazir', size=16)
 
-    # --- اضافه کردن لوگو به عنوان watermark کمرنگ در پس‌زمینه ---
+    # --- اضافه کردن لوگو به عنوان watermark در پس‌زمینه ---
     if os.path.exists(LOGO_PATH):
         try:
             from PIL import Image, ImageEnhance
 
-            # باز کردن لوگو و ایجاد شفافیت
+            # باز کردن لوگو و تنظیم شفافیت
             logo = Image.open(LOGO_PATH).convert("RGBA")
-            alpha = logo.split()[3]  # لایه آلفا
-            alpha = ImageEnhance.Brightness(alpha).enhance(0.05)  # کمرنگی بسیار بالا
+            alpha = logo.split()[3]
+            alpha = ImageEnhance.Brightness(alpha).enhance(0.15)  # کمرنگی مناسب
             logo.putalpha(alpha)
 
-            # ذخیره موقت با شفافیت
+            # ذخیره موقت
             temp_logo_path = 'temp_watermark.png'
             logo.save(temp_logo_path, format='PNG')
 
-            # اضافه کردن به PDF با موقعیت مرکزی و شفافیت
-            pdf.image(temp_logo_path, x=50, y=80, w=110, h=110, opacity=0.1)
+            # اضافه کردن به PDF با شفافیت و اندازه مناسب
+            pdf.image(temp_logo_path, x=50, y=80, w=110, h=110, opacity=0.15)
 
             # حذف فایل موقت
             os.remove(temp_logo_path)
@@ -784,5 +784,6 @@ if __name__ == '__main__':
 
     print("🚀 ربات در حال اجرا است...")
     application.run_polling()
+
 
 
